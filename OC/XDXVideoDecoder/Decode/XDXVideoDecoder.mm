@@ -434,7 +434,7 @@ static void VideoDecoderCallback(void *decompressionOutputRefCon, void *sourceFr
         decoderInfo->r_pps_size = r_ppsSize;
         
         nalu_type = ((uint8_t) data[startCodeRPPSIndex + 1] & 0x4F);
-        if (nalu_type == 0x44) {
+        if (nalu_type == 0x4E) {
             uint8_t *pps = &data[startCodeRPPSIndex + 1];
             [self copyDataWithOriginDataRef:&decoderInfo->r_pps newData:pps size:r_ppsSize];
         }

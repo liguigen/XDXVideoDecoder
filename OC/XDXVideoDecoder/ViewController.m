@@ -106,14 +106,24 @@ extern "C" {
 - (void)getVideoDecodeDataCallback:(CMSampleBufferRef)sampleBuffer isFirstFrame:(BOOL)isFirstFrame {
     if (self.isH265File) {
         // Note : the first frame not need to sort.
+        // Control the decoded frame to display
+        static Float64 lastTimestamp = 0;
         if (isFirstFrame) {
-            [self.sortHandler cleanLinkList];
-            CVPixelBufferRef pix = CMSampleBufferGetImageBuffer(sampleBuffer);
-            [self.previewView displayPixelBuffer:pix];
-            return;
+            lastTimestamp = [self getCurrentTimestamp] * 1000;
+            //NSLog(@"%s:%d lastTimestamp:%f", __FUNCTION__, __LINE__, lastTimestamp);
+        } else {
+            Float64 currentTimestamp = [self getCurrentTimestamp] * 1000;
+            //NSLog(@"%s:%d currentTimestamp:%f", __FUNCTION__, __LINE__, currentTimestamp);
+            while ((currentTimestamp - lastTimestamp) < 40) {
+                usleep(1000);
+                currentTimestamp = [self getCurrentTimestamp] * 1000;
+                //NSLog(@"%s:%d currentTimestamp:%f", __FUNCTION__, __LINE__, currentTimestamp);
+            }
+            lastTimestamp = [self getCurrentTimestamp] * 1000;
+            //NSLog(@"%s:%d lastTimestamp:%f", __FUNCTION__, __LINE__, lastTimestamp);
         }
-        
-        [self.sortHandler addDataToLinkList:sampleBuffer];
+        CVPixelBufferRef pix = CMSampleBufferGetImageBuffer(sampleBuffer);
+        [self.previewView displayPixelBuffer:pix];
     }else {
         CVPixelBufferRef pix = CMSampleBufferGetImageBuffer(sampleBuffer);
         [self.previewView displayPixelBuffer:pix];
@@ -136,4 +146,10 @@ extern "C" {
     [self.previewView displayPixelBuffer:CMSampleBufferGetImageBuffer(sampleBuffer)];
 }
 
+#pragma mark - Other
+- (Float64)getCurrentTimestamp {
+    CMClockRef hostClockRef = CMClockGetHostTimeClock();
+    CMTime hostTime = CMClockGetTime(hostClockRef);
+    return CMTimeGetSeconds(hostTime);
+}
 @end

@@ -249,10 +249,10 @@ static int GetAVStreamFPSTimeBase(AVStream *st) {
         }
         
         // 目前最高支持到3840*2160
-        if (sourceWidth > kXDXParseSupportMaxWidth || sourceHeight > kXDXParseSupportMaxHeight) {
+        /*if (sourceWidth > kXDXParseSupportMaxWidth || sourceHeight > kXDXParseSupportMaxHeight) {
             log4cplus_error(kModuleName, "%s: Not support the resolution",__func__);
             return NO;
-        }
+        }*/
         
         // 60FPS -> 1080P
         if (sourceFps > kXDXParseSupportMaxFps - kXDXParseFpsOffSet && (sourceWidth > kXDXParseWidth1920 || sourceHeight > kXDXParseHeight1080)) {
