@@ -10,16 +10,26 @@
 #import <AVFoundation/AVUtilities.h>
 #import <OpenGLES/ES2/glext.h>
 #import "log4cplus.h"
+#import <vector>
 
 #define kModuleName "XDXPreviewView"
 
 #define IS_IPAD UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad
+
+using namespace std;
 
 typedef enum : NSUInteger {
     XDXPixelBufferTypeNone = 0,
     XDXPixelBufferTypeNV12,
     XDXPixelBufferTypeRGB,
 } XDXPixelBufferType;
+
+typedef struct Vector2 {
+    GLfloat x;
+    GLfloat y;
+} Vector2;
+
+vector<vector<Vector2>> textureUVSet;
 
 enum
 {
@@ -155,6 +165,51 @@ GLfloat quadVertexData[] = {
                                 videoTextureCache:&_videoTextureCache
                                 colorBufferHandle:&_colorBufferHandle
                                 frameBufferHandle:&_frameBufferHandle];
+    [self makeTextureUVSet];
+}
+
+#pragma mark UVSet
+- (void)makeTextureUVSet{
+    int xSegments = 7;
+    int ySegments = 4;
+    int numPoints = (xSegments + 1) * (ySegments + 1);
+    vector<Vector2> imagePoints(numPoints, Vector2{0, 0});
+    int x, y;
+    for (y = 0; y < ySegments + 1; y++) {
+        GLfloat yCoord = y * 1.0f / ySegments;
+        for (x = 0; x < xSegments + 1; x++) {
+            GLfloat xCoord = x * 1.0f / xSegments;
+            int idx = y * (xSegments + 1) + x;
+            imagePoints[idx].x = xCoord;
+            imagePoints[idx].y = yCoord;
+        }
+    }
+    
+    int numFaces = xSegments * ySegments;
+    vector<vector<int>> facePoint2DIndexs(numFaces, vector<int>(4));
+    for (x = 0; x < xSegments; x++) {
+        for (y = 0; y < ySegments; y++) {
+            int idx = y * xSegments + x;
+            int idxLT = y * (xSegments + 1) + x;
+            int idxLB = idxLT + (xSegments + 1);
+            int idxRT = idxLT + 1;
+            int idxRB = idxLB + 1;
+            facePoint2DIndexs[idx][0] = idxLB;
+            facePoint2DIndexs[idx][1] = idxLT;
+            facePoint2DIndexs[idx][2] = idxRB;
+            facePoint2DIndexs[idx][3] = idxRT;
+        }
+    }
+    
+    textureUVSet.resize(numFaces, vector<Vector2>(4));
+    for (int i = 0; i < numFaces; i++) {
+        for (int j = 0; j < 4; j++) {
+            textureUVSet[i][j] = imagePoints[facePoint2DIndexs[i][j]];
+            /*if (i == 0) {
+                log4cplus_error(kModuleName, "textureUVSet xData:%f yData:%f", textureUVSet[i][j].x, textureUVSet[i][j].y);
+            }*/
+        }
+    }
 }
 
 #pragma mark Render
@@ -187,7 +242,7 @@ GLfloat quadVertexData[] = {
         log4cplus_error(kModuleName, "Not support current format.");
         return;
     }
-    
+    //log4cplus_error(kModuleName, "bufferType:%lu", (unsigned long)bufferType);
     CVOpenGLESTextureRef lumaTexture,chromaTexture,renderTexture;
     if (bufferType == XDXPixelBufferTypeNV12) {
         // Y
@@ -304,13 +359,29 @@ GLfloat quadVertexData[] = {
         self.screenWidth = [UIScreen mainScreen].bounds.size.width;
         
         quadVertexData[0] = -1 * normalizedSamplingSize.width;
-        quadVertexData[1] = -1 * normalizedSamplingSize.height;
-        quadVertexData[2] = normalizedSamplingSize.width;
-        quadVertexData[3] = -1 * normalizedSamplingSize.height;
-        quadVertexData[4] = -1 * normalizedSamplingSize.width;
-        quadVertexData[5] = normalizedSamplingSize.height;
+        quadVertexData[1] = -1 *normalizedSamplingSize.height;
+        quadVertexData[2] = -1 * normalizedSamplingSize.width;
+        quadVertexData[3] = normalizedSamplingSize.height;
+        quadVertexData[4] = normalizedSamplingSize.width;
+        quadVertexData[5] = -1 *normalizedSamplingSize.height;
         quadVertexData[6] = normalizedSamplingSize.width;
         quadVertexData[7] = normalizedSamplingSize.height;
+    }
+    
+    static int framesPerCam = 0;
+    static int camIndex = 0;
+    framesPerCam++;
+    if (framesPerCam == 4) {
+        framesPerCam = 0;
+        camIndex++;
+        if (camIndex == 27) {
+            camIndex = 0;
+        }
+    }
+    for (int i = 0; i < 4; i++) {
+        quadTextureData[i * 2] = textureUVSet[camIndex][i].x;
+        quadTextureData[i * 2 + 1] = textureUVSet[camIndex][i].y;
+        //log4cplus_error(kModuleName, "camIndex:%d, textureUVSet xData:%f yData:%f", camIndex, textureUVSet[camIndex][i].x, textureUVSet[camIndex][i].y);
     }
     
     glVertexAttribPointer(ATTRIB_VERTEX, 2, GL_FLOAT, 0, 0, quadVertexData);
@@ -349,7 +420,7 @@ GLfloat quadVertexData[] = {
     
     [self loadShaderWithBufferType:XDXPixelBufferTypeNV12];
     [self loadShaderWithBufferType:XDXPixelBufferTypeRGB];
-    
+    log4cplus_error(kModuleName, "createOpenGLContextWithWidth width:%d, height:%d", *width, *height);
     if (!*videoTextureCache) {
         CVReturn err = CVOpenGLESTextureCacheCreate(kCFAllocatorDefault, NULL, context, NULL, videoTextureCache);
         if (err != noErr)
