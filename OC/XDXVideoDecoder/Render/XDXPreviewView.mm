@@ -97,6 +97,7 @@ GLfloat quadVertexData[] = {
 @property (nonatomic, assign) CGSize    screenResolutionSize;
 @property (nonatomic, assign) XDXPixelBufferType bufferType;
 @property (nonatomic, assign) XDXPixelBufferType lastBufferType;
+@property (nonatomic, assign) int       camIndex;
 
 // 记录屏幕宽度,启动时如果是竖屏状态,会切换到横屏,所以屏幕宽高会改变,需要重新计算画面的尺寸。
 @property (nonatomic, assign) CGFloat screenWidth;
@@ -130,8 +131,9 @@ GLfloat quadVertexData[] = {
 }
 
 #pragma mark - public methods
-- (void)displayPixelBuffer:(CVPixelBufferRef)pixelBuffer {
+- (void)displayPixelBuffer:(CVPixelBufferRef)pixelBuffer direction:(int)direction {
     [self displayPixelBuffer:pixelBuffer
+           direction:direction
            videoTextureCache:_videoTextureCache
                      context:_context
                 backingWidth:_backingWidth
@@ -158,6 +160,7 @@ GLfloat quadVertexData[] = {
     self.screenWidth = 0;
     self.bufferType = XDXPixelBufferTypeNV12;
     self.lastBufferType = XDXPixelBufferTypeNone;
+    self.camIndex = 0;
     _preferredConversion = kXDXPreViewColorConversion601FullRange;
     
     _context = [self createOpenGLContextWithWidth:&_backingWidth
@@ -213,11 +216,11 @@ GLfloat quadVertexData[] = {
 }
 
 #pragma mark Render
-- (void)displayPixelBuffer:(CVPixelBufferRef)pixelBuffer videoTextureCache:(CVOpenGLESTextureCacheRef)videoTextureCache context:(EAGLContext *)context backingWidth:(GLint)backingWidth backingHeight:(GLint)backingHeight frameBufferHandle:(GLuint)frameBufferHandle nv12Program:(GLuint)nv12Program rgbProgram:(GLuint)rgbProgram preferredConversion:(const GLfloat *)preferredConversion displayInputTextureUniform:(GLuint)displayInputTextureUniform colorBufferHandle:(GLuint)colorBufferHandle{
+- (void)displayPixelBuffer:(CVPixelBufferRef)pixelBuffer direction:(int)direction videoTextureCache:(CVOpenGLESTextureCacheRef)videoTextureCache context:(EAGLContext *)context backingWidth:(GLint)backingWidth backingHeight:(GLint)backingHeight frameBufferHandle:(GLuint)frameBufferHandle nv12Program:(GLuint)nv12Program rgbProgram:(GLuint)rgbProgram preferredConversion:(const GLfloat *)preferredConversion displayInputTextureUniform:(GLuint)displayInputTextureUniform colorBufferHandle:(GLuint)colorBufferHandle{
     if (pixelBuffer == NULL) {
         return;
     }
-    
+    //NSLog(@"direction:%d", direction);
     CVReturn error;
     
     int frameWidth  = (int)CVPixelBufferGetWidth(pixelBuffer);
@@ -369,18 +372,23 @@ GLfloat quadVertexData[] = {
     }
     
     static int framesPerCam = 0;
-    static int camIndex = 0;
     framesPerCam++;
-    if (framesPerCam == 4) {
+    if (framesPerCam == 2) {
         framesPerCam = 0;
-        camIndex++;
-        if (camIndex == 27) {
-            camIndex = 0;
+        if (direction == 1) {
+            _camIndex++;
+        } else if (direction == 2) {
+            _camIndex--;
+        }
+        if (_camIndex > 27) {
+            _camIndex = 27;
+        } else if (_camIndex < 0) {
+            _camIndex = 0;
         }
     }
     for (int i = 0; i < 4; i++) {
-        quadTextureData[i * 2] = textureUVSet[camIndex][i].x;
-        quadTextureData[i * 2 + 1] = textureUVSet[camIndex][i].y;
+        quadTextureData[i * 2] = textureUVSet[_camIndex][i].x;
+        quadTextureData[i * 2 + 1] = textureUVSet[_camIndex][i].y;
         //log4cplus_error(kModuleName, "camIndex:%d, textureUVSet xData:%f yData:%f", camIndex, textureUVSet[camIndex][i].x, textureUVSet[camIndex][i].y);
     }
     

@@ -23,7 +23,7 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  display
  */
-- (void)displayPixelBuffer:(CVPixelBufferRef)pixelBuffer;
+- (void)displayPixelBuffer:(CVPixelBufferRef)pixelBuffer direction:(int)direction;
 
 @end
 
